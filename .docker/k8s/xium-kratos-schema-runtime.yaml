@@ -1,0 +1,594 @@
+apiVersion: secrets.xium.io/v1alpha1
+kind: AegisInjection
+metadata:
+  name: example-schema-kratos-secrets
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: runtime-secret-injection
+    xium.io/managed-by: manual
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: xium-kratos
+      app.kubernetes.io/instance: example-schema-xium-kratos
+      app.kubernetes.io/component: runtime
+      xium.io/aegis-injection: example-schema-kratos-secrets
+  containers:
+    - name: kratos
+  env:
+    DSN: app/example-schema/xium-kratos/dsn
+    COURIER_SMTP_CONNECTION_URI: app/example-schema/xium-kratos/courier_smtp_connection_uri
+    SECRETS_COOKIE_0: app/example-schema/xium-kratos/secrets_cookie_0
+    SECRETS_CIPHER_0: app/example-schema/xium-kratos/secrets_cipher_0
+---
+apiVersion: secrets.xium.io/v1alpha1
+kind: AegisInjection
+metadata:
+  name: example-schema-kratos-migrate-secrets
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: migrate-secret-injection
+    xium.io/managed-by: manual
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-30"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: xium-kratos
+      app.kubernetes.io/instance: example-schema-xium-kratos
+      app.kubernetes.io/component: migrate
+      xium.io/aegis-injection: example-schema-kratos-migrate-secrets
+  containers:
+    - name: kratos-migrate
+  env:
+    DSN: app/example-schema/xium-kratos/dsn
+    COURIER_SMTP_CONNECTION_URI: app/example-schema/xium-kratos/courier_smtp_connection_uri
+    SECRETS_COOKIE_0: app/example-schema/xium-kratos/secrets_cookie_0
+    SECRETS_CIPHER_0: app/example-schema/xium-kratos/secrets_cipher_0
+---
+apiVersion: kms.xium.io/v1alpha1
+kind: DirectInjection
+metadata:
+  name: example-schema-xium-kratos-runtime-postgresql-ca
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: runtime-postgresql-ca
+    xium.io/managed-by: manual
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: xium-kratos
+      app.kubernetes.io/instance: example-schema-xium-kratos
+      app.kubernetes.io/component: runtime
+  containers:
+    - name: kratos
+  injection:
+    certificates:
+      - secretRef: postgresql-tls
+        mountPath: /var/xium.dev/certs/postgresql-ca.crt
+        mode: "0444"
+---
+apiVersion: kms.xium.io/v1alpha1
+kind: DirectInjection
+metadata:
+  name: example-schema-xium-kratos-migrate-postgresql-ca
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: migrate-postgresql-ca
+    xium.io/managed-by: manual
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: xium-kratos
+      app.kubernetes.io/instance: example-schema-xium-kratos
+      app.kubernetes.io/component: migrate
+  containers:
+    - name: kratos-migrate
+  injection:
+    certificates:
+      - secretRef: postgresql-tls
+        mountPath: /var/xium.dev/certs/postgresql-ca.crt
+        mode: "0444"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-schema-xium-kratos-config
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: config
+    xium.io/managed-by: manual
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+data:
+  kratos.yml: |
+    version: v1.3.1
+
+    serve:
+      public:
+        base_url: http://example-schema-xium-kratos-public.security.svc.cluster.local:4433/
+        port: 4433
+        host: 0.0.0.0
+      admin:
+        base_url: http://example-schema-xium-kratos-admin.security.svc.cluster.local:4434/
+        port: 4434
+        host: 0.0.0.0
+
+    selfservice:
+      default_browser_return_url: https://dummy.example.invalid/
+      allowed_return_urls:
+        - https://dummy.example.invalid/
+      methods:
+        password:
+          enabled: true
+      flows:
+        login:
+          ui_url: https://dummy.example.invalid/login
+        registration:
+          ui_url: https://dummy.example.invalid/registration
+        settings:
+          ui_url: https://dummy.example.invalid/settings
+        recovery:
+          enabled: true
+          ui_url: https://dummy.example.invalid/recovery
+        verification:
+          enabled: true
+          ui_url: https://dummy.example.invalid/verification
+
+    identity:
+      default_schema_id: idium-userpool-username-v1
+      schemas:
+        - id: idium-userpool-username-v1
+          url: file:///etc/xium-kratos/idium-userpool-username-v1.schema.json
+        - id: idium-userpool-alias-v1
+          url: file:///etc/xium-kratos/idium-userpool-alias-v1.schema.json
+        - id: idium-userpool-username-attributes-v1
+          url: file:///etc/xium-kratos/idium-userpool-username-attributes-v1.schema.json
+
+    log:
+      level: info
+      format: json
+
+  idium-userpool-username-v1.schema.json: |
+    {
+      "$id": "https://schemas.xium.dev/idium/identity/idium-userpool-username-v1.schema.json",
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "IDium User Pool Username",
+      "type": "object",
+      "properties": {
+        "traits": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string",
+              "ory.sh/kratos": {
+                "credentials": {
+                  "password": {
+                    "identifier": true
+                  }
+                }
+              }
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "ory.sh/kratos": {
+                "recovery": {
+                  "via": "email"
+                },
+                "verification": {
+                  "via": "email"
+                }
+              }
+            },
+            "phone_number": {
+              "type": "string",
+              "format": "tel",
+              "ory.sh/kratos": {
+                "recovery": {
+                  "via": "sms"
+                },
+                "verification": {
+                  "via": "sms"
+                }
+              }
+            },
+            "custom": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "traits"
+      ],
+      "additionalProperties": false
+    }
+  idium-userpool-alias-v1.schema.json: |
+    {
+      "$id": "https://schemas.xium.dev/idium/identity/idium-userpool-alias-v1.schema.json",
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "IDium User Pool Alias",
+      "type": "object",
+      "properties": {
+        "traits": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string",
+              "ory.sh/kratos": {
+                "credentials": {
+                  "password": {
+                    "identifier": true
+                  }
+                }
+              }
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "ory.sh/kratos": {
+                "credentials": {
+                  "password": {
+                    "identifier": true
+                  }
+                },
+                "recovery": {
+                  "via": "email"
+                },
+                "verification": {
+                  "via": "email"
+                }
+              }
+            },
+            "phone_number": {
+              "type": "string",
+              "format": "tel",
+              "ory.sh/kratos": {
+                "credentials": {
+                  "password": {
+                    "identifier": true
+                  }
+                },
+                "recovery": {
+                  "via": "sms"
+                },
+                "verification": {
+                  "via": "sms"
+                }
+              }
+            },
+            "custom": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "traits"
+      ],
+      "additionalProperties": false
+    }
+  idium-userpool-username-attributes-v1.schema.json: |
+    {
+      "$id": "https://schemas.xium.dev/idium/identity/idium-userpool-username-attributes-v1.schema.json",
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "IDium User Pool Username Attributes",
+      "type": "object",
+      "properties": {
+        "traits": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string",
+              "ory.sh/kratos": {
+                "credentials": {
+                  "password": {
+                    "identifier": true
+                  }
+                }
+              }
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "ory.sh/kratos": {
+                "credentials": {
+                  "password": {
+                    "identifier": true
+                  }
+                },
+                "recovery": {
+                  "via": "email"
+                },
+                "verification": {
+                  "via": "email"
+                }
+              }
+            },
+            "phone_number": {
+              "type": "string",
+              "format": "tel",
+              "ory.sh/kratos": {
+                "credentials": {
+                  "password": {
+                    "identifier": true
+                  }
+                },
+                "recovery": {
+                  "via": "sms"
+                },
+                "verification": {
+                  "via": "sms"
+                }
+              }
+            },
+            "custom": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "traits"
+      ],
+      "additionalProperties": false
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: example-schema-xium-kratos-migrate
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: migrate
+    xium.io/aegis-injection: example-schema-kratos-migrate-secrets
+    xium.io/managed-by: manual
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        aegis.scm.xium.io/injection: "enabled"
+        app.kubernetes.io/name: xium-kratos
+        app.kubernetes.io/instance: example-schema-xium-kratos
+        app.kubernetes.io/component: migrate
+        xium.io/aegis-injection: example-schema-kratos-migrate-secrets
+      annotations:
+        kms.xium.io/injection: preinjection
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-private
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kratos-migrate
+          image: xiumjp/xium-karats:dev
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - /usr/bin/kratos
+          args:
+            - migrate
+            - sql
+            - --config
+            - /etc/xium-kratos/kratos.yml
+            - --read-from-env
+            - --yes
+          env:
+            - name: XIUM_KRATOS_SCHEMA_RUNTIME_NAME
+              value: example-schema
+            - name: XIUM_KRATOS_SCHEMA_ID
+              value: idium-userpool-username-v1
+            - name: XIUM_KRATOS_SCHEMA_PATH
+              value: /etc/xium-kratos/idium-userpool-username-v1.schema.json
+            - name: XIUM_KRATOS_PUBLIC_BASE_URL
+              value: http://example-schema-xium-kratos-public.security.svc.cluster.local:4433/
+            - name: XIUM_KRATOS_ADMIN_BASE_URL
+              value: http://example-schema-xium-kratos-admin.security.svc.cluster.local:4434/
+          volumeMounts:
+            - name: kratos-config
+              mountPath: /etc/xium-kratos
+              readOnly: true
+      volumes:
+        - name: kratos-config
+          configMap:
+            name: example-schema-xium-kratos-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-schema-xium-kratos
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: runtime
+    xium.io/aegis-injection: example-schema-kratos-secrets
+    xium.io/managed-by: manual
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: xium-kratos
+      app.kubernetes.io/instance: example-schema-xium-kratos
+      app.kubernetes.io/component: runtime
+  template:
+    metadata:
+      labels:
+        aegis.scm.xium.io/injection: "enabled"
+        app.kubernetes.io/name: xium-kratos
+        app.kubernetes.io/instance: example-schema-xium-kratos
+        app.kubernetes.io/component: runtime
+        xium.io/aegis-injection: example-schema-kratos-secrets
+      annotations:
+        kms.xium.io/injection: preinjection
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-private
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kratos
+          image: xiumjp/xium-karats:dev
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - /usr/bin/kratos
+          args:
+            - serve
+            - --config
+            - /etc/xium-kratos/kratos.yml
+            - --watch-courier
+          ports:
+            - name: public
+              containerPort: 4433
+            - name: admin
+              containerPort: 4434
+          env:
+            - name: XIUM_KRATOS_SCHEMA_RUNTIME_NAME
+              value: example-schema
+            - name: XIUM_KRATOS_SCHEMA_ID
+              value: idium-userpool-username-v1
+            - name: XIUM_KRATOS_SCHEMA_PATH
+              value: /etc/xium-kratos/idium-userpool-username-v1.schema.json
+            - name: XIUM_KRATOS_PUBLIC_BASE_URL
+              value: http://example-schema-xium-kratos-public.security.svc.cluster.local:4433/
+            - name: XIUM_KRATOS_ADMIN_BASE_URL
+              value: http://example-schema-xium-kratos-admin.security.svc.cluster.local:4434/
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: admin
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health/alive
+              port: admin
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: kratos-config
+              mountPath: /etc/xium-kratos
+              readOnly: true
+      volumes:
+        - name: kratos-config
+          configMap:
+            name: example-schema-xium-kratos-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-schema-xium-kratos-public
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: public
+    xium.io/managed-by: manual
+    xium.io/external-access: "enabled"
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: runtime
+  ports:
+    - name: public
+      port: 4433
+      targetPort: public
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-schema-xium-kratos-admin
+  namespace: security
+  labels:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: admin
+    xium.io/managed-by: manual
+    xium.io/external-access: "enabled"
+    xium.io/project-component: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: xium-kratos
+    app.kubernetes.io/instance: example-schema-xium-kratos
+    app.kubernetes.io/component: runtime
+  ports:
+    - name: admin
+      port: 4434
+      targetPort: admin
